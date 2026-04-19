@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Three Tier K8s App</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1 { color: #333; text-align: center; }
+        .tier {
+            background: white;
+            padding: 20px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border-left: 4px solid #007bff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        input {
+            padding: 10px;
+            width: 300px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            padding: 10px 20px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+        button:hover { background: #0056b3; }
+        #items {
+            margin-top: 20px;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .status-ok { color: green; font-weight: bold; }
+        .status-err { color: red; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>🚀 Three Tier Web App on Kubernetes</h1>
+
+    <div class="tier">
+        <h3>Tier 1 — Frontend (Nginx)</h3>
+        <p class="status-ok">✅ Frontend is running!</p>
+    </div>
+
+    <div class="tier">
+        <h3>Tier 2 — Backend (Node.js API)</h3>
+        <p id="backend-status">Checking backend...</p>
+    </div>
+
+    <div class="tier">
+        <h3>Tier 3 — Database (MongoDB)</h3>
+        <p id="db-status">Checking database...</p>
+    </div>
+
+    <div class="tier">
+        <h3>Add Item to Database</h3>
+        <input type="text" id="itemInput" placeholder="Enter item name" />
+        <button onclick="addItem()">Add Item</button>
+    </div>
+
+    <div id="items">
+        <h3>Items Saved in Database:</h3>
+        <div id="items-list">Loading...</div>
+    </div>
+
+    <script>
+        const BACKEND_URL = `http://${window.location.hostname}:30500`;
+
+        async function checkBackend() {
+            try {
+                const res = await fetch(`${BACKEND_URL}/health`);
+                const data = await res.json();
+                document.getElementById('backend-status').innerHTML =
+                    `<span class="status-ok">✅ Backend is running! Uptime: ${Math.floor(data.uptime)}s</span>`;
+                document.getElementById('db-status').innerHTML =
+                    `<span class="status-ok">✅ Database connected!</span>`;
+            } catch (err) {
+                document.getElementById('backend-status').innerHTML =
+                    '<span class="status-err">❌ Backend not reachable</span>';
+                document.getElementById('db-status').innerHTML =
+                    '<span class="status-err">❌ Database not reachable</span>';
+            }
+        }
+
+        async function loadItems() {
+            try {
+                const res = await fetch(`${BACKEND_URL}/api/items`);
+                const items = await res.json();
+                const list = document.getElementById('items-list');
+                if (items.length === 0) {
+                    list.innerHTML = '<p>No items yet. Add one above!</p>';
+                } else {
+                    list.innerHTML = items.map(item =>
+                        `<div class="item">📦 ${item.name} <small style="color:#999">${new Date(item.createdAt).toLocaleString()}</small></div>`
+                    ).join('');
+                }
+            } catch (err) {
+                document.getElementById('items-list').innerHTML =
+                    '<p style="color:red">Could not load items</p>';
+            }
+        }
+
+        async function addItem() {
+            const name = document.getElementById('itemInput').value.trim();
+            if (!name) return alert('Please enter an item name');
+            try {
+                await fetch(`${BACKEND_URL}/api/items`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name })
+                });
+                document.getElementById('itemInput').value = '';
+                loadItems();
+            } catch (err) {
+                alert('Could not add item. Check backend connection.');
+            }
+        }
+
+        checkBackend();
+        loadItems();
+        setInterval(() => { checkBackend(); loadItems(); }, 15000);
+    </script>
+</body>
+</html>
